@@ -17,27 +17,32 @@ One command takes a clean machine (Windows, macOS, or Linux) to a working openco
 
 ## Usage
 
-Clone or download this repo, then run the launcher for your OS.
+No clone required. Run the one-liner for your OS.
 
-### Windows
+### Windows (PowerShell)
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File setup.ps1
+irm https://raw.githubusercontent.com/seiz888/opencode-setup/main/setup.ps1 | iex
 ```
 
 ### macOS / Linux
 
 ```bash
-bash setup.sh
+curl -fsSL https://raw.githubusercontent.com/seiz888/opencode-setup/main/setup.sh | bash
 ```
 
-The launcher ensures Node.js is present (installing it if needed), then runs
-`setup-opencode.mjs`, which prompts for credentials and writes the config.
+The launcher ensures Node.js is present (installing it if needed), downloads
+`setup-opencode.mjs`, then runs it to prompt for credentials and write the config.
 
-You can also run the core installer directly if Node.js is already installed:
+### From a clone
+
+If you prefer to inspect first, clone and run locally:
 
 ```bash
-node setup-opencode.mjs
+git clone https://github.com/seiz888/opencode-setup.git
+cd opencode-setup
+node setup-opencode.mjs        # if Node.js is already installed
+# or use the bootstrap launcher: bash setup.sh  /  powershell -ExecutionPolicy Bypass -File setup.ps1
 ```
 
 ## Prompts

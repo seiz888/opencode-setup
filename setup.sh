@@ -1,19 +1,30 @@
 #!/usr/bin/env bash
 # setup.sh - macOS/Linux bootstrap for opencode setup
 # Ensures Node.js (with npm) exists, then runs setup-opencode.mjs.
-# Usage:  bash setup.sh   (or: chmod +x setup.sh && ./setup.sh)
+# Works both locally (cloned repo) and piped:
+#   curl -fsSL https://raw.githubusercontent.com/seiz888/opencode-setup/main/setup.sh | bash
 
 set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MJS="$SCRIPT_DIR/setup-opencode.mjs"
+RAW_BASE="https://raw.githubusercontent.com/seiz888/opencode-setup/main"
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
 echo "=== opencode setup bootstrap (Unix) ==="
 
-if [ ! -f "$MJS" ]; then
-  echo "setup-opencode.mjs not found next to setup.sh ($MJS)" >&2
-  exit 1
+# resolve setup-opencode.mjs: local next to this script, else download to temp
+SCRIPT_DIR=""
+if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]:-}" ]; then
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
+
+if [ -n "$SCRIPT_DIR" ] && [ -f "$SCRIPT_DIR/setup-opencode.mjs" ]; then
+  MJS="$SCRIPT_DIR/setup-opencode.mjs"
+else
+  MJS="$(mktemp -t setup-opencode.XXXXXX.mjs)"
+  echo "downloading setup-opencode.mjs ..."
+  if have curl; then curl -fsSL "$RAW_BASE/setup-opencode.mjs" -o "$MJS"
+  elif have wget; then wget -qO "$MJS" "$RAW_BASE/setup-opencode.mjs"
+  else echo "need curl or wget to download the installer" >&2; exit 1; fi
 fi
 
 install_node() {
@@ -23,7 +34,6 @@ install_node() {
   if [ "$os" = "Darwin" ]; then
     if have brew; then echo "installing node via brew..."; brew install node && return 0; fi
   else
-    # Linux: try common package managers (need sudo)
     if have apt-get; then
       echo "installing node via apt..."
       sudo apt-get update && sudo apt-get install -y nodejs npm && return 0
@@ -57,7 +67,6 @@ if have node; then
 else
   echo "node not found, installing..."
   install_node || true
-  # try to pick up fnm-managed node in this shell
   if ! have node && have fnm; then eval "$(fnm env)"; fi
 fi
 
@@ -67,5 +76,14 @@ if ! have node; then
 fi
 
 # 2. run the cross-platform installer
+# when this script is piped (curl | bash), stdin is the pipe, so attach the
+# terminal for the installer's interactive prompts.
 echo "running setup-opencode.mjs ..."
-node "$MJS"
+if [ -t 0 ]; then
+  node "$MJS"
+elif [ -e /dev/tty ]; then
+  node "$MJS" < /dev/tty
+else
+  echo "no interactive terminal available; download the repo and run 'node setup-opencode.mjs' directly." >&2
+  exit 1
+fi

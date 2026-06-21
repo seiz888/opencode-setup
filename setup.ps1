@@ -1,10 +1,10 @@
 # setup.ps1 - Windows bootstrap for opencode setup
 # Ensures Node.js (with npm) exists, then runs setup-opencode.mjs.
-# Usage:  powershell -ExecutionPolicy Bypass -File setup.ps1
+# Works both locally (cloned repo) and piped:
+#   irm https://raw.githubusercontent.com/seiz888/opencode-setup/main/setup.ps1 | iex
 
 $ErrorActionPreference = "Stop"
-$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$mjs = Join-Path $scriptDir "setup-opencode.mjs"
+$RawBase = "https://raw.githubusercontent.com/seiz888/opencode-setup/main"
 
 function Have($name) {
   return [bool](Get-Command $name -ErrorAction SilentlyContinue)
@@ -18,9 +18,18 @@ function Refresh-Path {
 
 Write-Host "=== opencode setup bootstrap (Windows) ==="
 
-if (-not (Test-Path $mjs)) {
-  Write-Error "setup-opencode.mjs not found next to setup.ps1 ($mjs)"
-  exit 1
+# resolve setup-opencode.mjs: local next to this script, else download to temp
+$scriptDir = if ($PSScriptRoot) { $PSScriptRoot }
+             elseif ($MyInvocation.MyCommand.Path) { Split-Path -Parent $MyInvocation.MyCommand.Path }
+             else { $null }
+$localMjs = if ($scriptDir) { Join-Path $scriptDir "setup-opencode.mjs" } else { $null }
+
+if ($localMjs -and (Test-Path $localMjs)) {
+  $mjs = $localMjs
+} else {
+  $mjs = Join-Path ([System.IO.Path]::GetTempPath()) "setup-opencode.mjs"
+  Write-Host "downloading setup-opencode.mjs ..."
+  Invoke-WebRequest -UseBasicParsing "$RawBase/setup-opencode.mjs" -OutFile $mjs
 }
 
 # 1. ensure node
@@ -34,13 +43,13 @@ if (Have "node") {
   }
   if (-not (Have "node")) {
     Write-Host "winget unavailable or failed; trying fnm..."
-    if (-not (Have "fnm")) {
-      if (Have "winget") { winget install --id Schniz.fnm -e --accept-source-agreements --accept-package-agreements; Refresh-Path }
+    if (-not (Have "fnm") -and (Have "winget")) {
+      winget install --id Schniz.fnm -e --accept-source-agreements --accept-package-agreements
+      Refresh-Path
     }
     if (Have "fnm") {
       fnm install --lts
       fnm use --lts
-      $env:Path = "$(fnm env --json | ConvertFrom-Json | Select-Object -ExpandProperty PATH);$env:Path" 2>$null
     }
   }
   Refresh-Path
@@ -48,10 +57,9 @@ if (Have "node") {
 
 if (-not (Have "node")) {
   Write-Error "Could not install Node.js automatically. Install it from https://nodejs.org and re-run."
-  exit 1
+  return
 }
 
 # 2. run the cross-platform installer
 Write-Host "running setup-opencode.mjs ..."
 node $mjs
-exit $LASTEXITCODE
