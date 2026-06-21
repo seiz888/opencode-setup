@@ -1,0 +1,17 @@
+# opencode runtime / config (never commit user secrets or local state)
+.config/
+opencode.json
+oh-my-opencode-slim.json
+*.bak-*
+
+# node
+node_modules/
+npm-debug.log*
+
+# os cruft
+.DS_Store
+Thumbs.db
+
+# env / secrets
+.env
+*.local
